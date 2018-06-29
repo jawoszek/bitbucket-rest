@@ -19,13 +19,16 @@ package com.cdancy.bitbucket.rest.features;
 
 import com.cdancy.bitbucket.rest.BitbucketApi;
 import com.cdancy.bitbucket.rest.BitbucketApiMetadata;
+import com.cdancy.bitbucket.rest.domain.admin.DetailedUser;
 import com.cdancy.bitbucket.rest.domain.admin.UserPage;
 import com.cdancy.bitbucket.rest.BaseBitbucketMockTest;
+import com.cdancy.bitbucket.rest.domain.common.RequestStatus;
 import com.google.common.collect.ImmutableMap;
 import com.squareup.okhttp.mockwebserver.MockResponse;
 import com.squareup.okhttp.mockwebserver.MockWebServer;
 import org.testng.annotations.Test;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,7 +42,7 @@ public class AdminApiMockTest extends BaseBitbucketMockTest {
     private final String getMethod = "GET";
 
     private final String localContext = "test";
-            
+
     public void testGetListUserByGroup() throws Exception {
         final MockWebServer server = mockWebServer();
 
@@ -47,7 +50,7 @@ public class AdminApiMockTest extends BaseBitbucketMockTest {
                 .setBody(payloadFromResource("/admin-list-user-by-group.json"))
                 .setResponseCode(200));
         try (final BitbucketApi baseApi = api(server.getUrl("/"))) {
-            
+
             final UserPage up = baseApi.adminApi().listUsersByGroup(localContext, null, 0, 2);
             assertThat(up).isNotNull();
             assertThat(up.errors()).isEmpty();
@@ -69,7 +72,7 @@ public class AdminApiMockTest extends BaseBitbucketMockTest {
                 .setBody(payloadFromResource("/admin-list-user-by-group-error.json"))
                 .setResponseCode(401));
         try (final BitbucketApi baseApi = api(server.getUrl("/"))) {
-            
+
             final UserPage up = baseApi.adminApi().listUsersByGroup(localContext, null, 0, 2);
             assertThat(up).isNotNull();
             assertThat(up.errors()).isNotEmpty();
@@ -81,7 +84,7 @@ public class AdminApiMockTest extends BaseBitbucketMockTest {
             server.shutdown();
         }
     }
-    
+
     public void testListUsers() throws Exception {
         final MockWebServer server = mockWebServer();
 
@@ -118,6 +121,95 @@ public class AdminApiMockTest extends BaseBitbucketMockTest {
             final Map<String, ?> queryParams = ImmutableMap.of("filter", "blah%20blah", limitKeyword, 2, startKeyword, 0);
             assertSent(server, getMethod, restApiPath + BitbucketApiMetadata.API_VERSION
                     + "/admin/users", queryParams);
+        } finally {
+            baseApi.close();
+            server.shutdown();
+        }
+    }
+
+    public void testPostUser() throws Exception {
+        final MockWebServer server = mockWebServer();
+
+        server.enqueue(new MockResponse().setResponseCode(204));
+        final BitbucketApi baseApi = api(server.getUrl("/"));
+        final AdminApi api = baseApi.adminApi();
+        try {
+            final RequestStatus status = api.postUser("user", "pass", "display", "email", false, "notify");
+            assertThat(status.value()).isTrue();
+            assertThat(status.errors()).isEmpty();
+
+            final Map<String, String> queryParams = new HashMap<>();
+            queryParams.put("name", "user");
+            queryParams.put("password", "pass");
+            queryParams.put("displayName", "display");
+            queryParams.put("emailAddress", "email");
+            queryParams.put("addToDefaultGroup", "false");
+            queryParams.put("notify", "notify");
+            assertSent(server, "POST", restApiPath + BitbucketApiMetadata.API_VERSION + "/admin/users", queryParams);
+        } finally {
+            baseApi.close();
+            server.shutdown();
+        }
+    }
+
+    public void testPostUserOnError() throws Exception {
+        final MockWebServer server = mockWebServer();
+
+        server.enqueue(new MockResponse().setResponseCode(400));
+        final BitbucketApi baseApi = api(server.getUrl("/"));
+        final AdminApi api = baseApi.adminApi();
+        try {
+            final RequestStatus status = api.postUser("user", "pass", "display", "email", false, "notify");
+            assertThat(status.value()).isFalse();
+            assertThat(status.errors()).isNotEmpty();
+
+            final Map<String, String> queryParams = new HashMap<>();
+            queryParams.put("name", "user");
+            queryParams.put("password", "pass");
+            queryParams.put("displayName", "display");
+            queryParams.put("emailAddress", "email");
+            queryParams.put("addToDefaultGroup", "false");
+            queryParams.put("notify", "notify");
+            assertSent(server, "POST", restApiPath + BitbucketApiMetadata.API_VERSION + "/admin/users", queryParams);
+        } finally {
+            baseApi.close();
+            server.shutdown();
+        }
+    }
+
+    public void testDeleteUser() throws Exception {
+        final MockWebServer server = mockWebServer();
+
+        server.enqueue(new MockResponse().setBody(payloadFromResource("/admin-delete-user.json")).setResponseCode(200));
+        final BitbucketApi baseApi = api(server.getUrl("/"));
+        final AdminApi api = baseApi.adminApi();
+        try {
+            final DetailedUser detailedUser = api.deleteUser("user");
+            assertThat(detailedUser).isNotNull();
+            assertThat(detailedUser.errors()).isEmpty();
+
+            final Map<String, ?> queryParams = ImmutableMap.of("name", "user");
+            assertSent(server, "DELETE", restApiPath + BitbucketApiMetadata.API_VERSION + "/admin/users", queryParams);
+        } finally {
+            baseApi.close();
+            server.shutdown();
+        }
+    }
+
+    public void testDeleteUserOnError() throws Exception {
+        final MockWebServer server = mockWebServer();
+
+        server.enqueue(new MockResponse().setBody(payloadFromResource("/admin-delete-user-error.json")).setResponseCode(400));
+        final BitbucketApi baseApi = api(server.getUrl("/"));
+        final AdminApi api = baseApi.adminApi();
+        try {
+            final DetailedUser detailedUser = api.deleteUser("user");
+            assertThat(detailedUser).isNotNull();
+            assertThat(detailedUser.name()).isNull();
+            assertThat(detailedUser.errors()).isNotEmpty();
+
+            final Map<String, ?> queryParams = ImmutableMap.of("name", "user");
+            assertSent(server, "DELETE", restApiPath + BitbucketApiMetadata.API_VERSION + "/admin/users", queryParams);
         } finally {
             baseApi.close();
             server.shutdown();

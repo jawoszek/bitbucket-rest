@@ -19,7 +19,9 @@ package com.cdancy.bitbucket.rest.features;
 
 import com.cdancy.bitbucket.rest.BaseBitbucketApiLiveTest;
 import com.cdancy.bitbucket.rest.TestUtilities;
+import com.cdancy.bitbucket.rest.domain.admin.DetailedUser;
 import com.cdancy.bitbucket.rest.domain.admin.UserPage;
+import com.cdancy.bitbucket.rest.domain.common.RequestStatus;
 import com.cdancy.bitbucket.rest.domain.pullrequest.User;
 import org.testng.annotations.Test;
 
@@ -28,20 +30,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Test(groups = "live", testName = "AdminApiLiveTest", singleThreaded = true)
 public class AdminApiLiveTest extends BaseBitbucketApiLiveTest {
 
+    private final static String testUserName = "TestUserName";
+
     @Test
     public void testListUsersByGroup() {
         final UserPage userPage = api().listUsersByGroup(defaultBitbucketGroup, null, null, null);
         assertThat(userPage).isNotNull();
         assertThat(userPage.size() > 0).isTrue();
     }
-    
+
     @Test
     public void testListUsersByNonExistentGroup() {
         final UserPage userPage = api().listUsersByGroup(TestUtilities.randomString(), null, null, null);
         assertThat(userPage).isNotNull();
         assertThat(userPage.size() == 0).isTrue();
     }
-    
+
     @Test
     public void testListUsers() {
         final User user = TestUtilities.getDefaultUser(this.bitbucketAuthentication, this.api);
@@ -51,14 +55,36 @@ public class AdminApiLiveTest extends BaseBitbucketApiLiveTest {
             assertThat(userPage.size() > 0).isTrue();
         }
     }
-    
+
     @Test
     public void testListUsersNonExistent() {
         final UserPage userPage = api().listUsers(TestUtilities.randomString(), null, null);
         assertThat(userPage).isNotNull();
         assertThat(userPage.size() == 0).isTrue();
     }
-    
+
+    @Test
+    public void testPostUser() {
+        final RequestStatus requestStatus = api().postUser(testUserName, testUserName, testUserName,
+            "testUser@test.test", null, null);
+        assertThat(requestStatus).isNotNull();
+        assertThat(requestStatus.value()).isTrue();
+    }
+
+    @Test (dependsOnMethods = "testPostUser")
+    public void testListSpecificUser() {
+        final UserPage userPage = api().listUsers(testUserName, null, null);
+        assertThat(userPage).isNotNull();
+        assertThat(userPage.size() > 0).isTrue();
+    }
+
+    @Test (dependsOnMethods = "testListSpecificUser")
+    public void testDeleteUser() {
+        final DetailedUser deletedUser = api().deleteUser(testUserName);
+        assertThat(deletedUser).isNotNull();
+        assertThat(deletedUser.errors().isEmpty()).isTrue();
+    }
+
     private AdminApi api() {
         return api.adminApi();
     }
